@@ -1,0 +1,5 @@
+[package]
+
+name = "Chip8_Rust"
+version = "0.0.1"
+authors = [ "Le Thanh NM <nmlethanh91@gmail.com>" ]
