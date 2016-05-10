@@ -1,3 +1,5 @@
+extern crate rand;
+
 struct Chip8 {
     opcode      : u16,
     memory      : [u8; 4096],
@@ -12,6 +14,8 @@ struct Chip8 {
     key         : [u8; 16],
 
     fontset     : [u8; 80],
+    drawFlag    : bool,
+    keyPressed  : bool,
 }
 
 impl Chip8 {
@@ -188,44 +192,84 @@ impl Chip8 {
 
     }
     fn opcodeAxxx(&self) {
-        match self.opcode & 0x000F{
-            0x0000 => println!("Clear screen"),
-            0x000E => println!("Return from sub routine"),
-            _      => println!("Unknown opcode"),
-        }
+        indexReg = self.opcode & 0x0FFF;
+        self.pc += 2;
     }
+
     fn opcodeBxxx(&self) {
-        match self.opcode & 0x000F{
-            0x0000 => println!("Clear screen"),
-            0x000E => println!("Return from sub routine"),
-            _      => println!("Unknown opcode"),
-        }
+        self.pc = (self.opcode & 0x0FFF) + self.regV[0];
     }
     fn opcodeCxxx(&self) {
-        match self.opcode & 0x000F{
-            0x0000 => println!("Clear screen"),
-            0x000E => println!("Return from sub routine"),
-            _      => println!("Unknown opcode"),
-        }
-    }
+        let indexX: usize = (self.opcode & 0x0F00) >> 8;
+        use rand::Rng;
+        self.regV[indexX] = (self.opcode & 0x00FF) & rand::thread_rng().gen();
+        self.pc += 2;
+    } 
     fn opcodeDxxx(&self) {
-        match self.opcode & 0x000F{
-            0x0000 => println!("Clear screen"),
-            0x000E => println!("Return from sub routine"),
-            _      => println!("Unknown opcode"),
+        let indexX: usize = (self.opcode & 0x0F00) >> 8;
+        let indexY: usize = (self.opcode & 0x00F0) >> 4;
+        let iX = self.regV[indexX];
+        let iY = self.regV[indexY];
+        let height = self.opcode & 0x000F;
+        let mut pixel = 0;
+
+        self.regV[0xF as usize] = 0;
+        for y in 0..height {
+            pixel = self.memory[(self.indexReg + y) as usize];
+            for x in 0..8 {
+                if (self.pixel & (0x80 >> x)) != 0 {
+                    if self.gfx[(iX + x + ((y + iY) * 64)) as usize] == 1 {
+                        self.regV[0xF as usize] = 1;
+                    }
+                    self.gfx[(iX + x + ((y + iY) * 64)) as usize] ^= 1;
+                }
+            }
         }
+
+        self.drawFlag = true;
+        self.pc += 2;
     }
     fn opcodeExxx(&self) {
         match self.opcode & 0x000F{
-            0x0000 => println!("Clear screen"),
-            0x000E => println!("Return from sub routine"),
+            0x000E => {
+                if self.key[self.regV[((self.opcode & 0x0F00) >> 8) as usize] as usize] != 0 {
+                    self.pc += 2;
+                }
+                self.pc += 2;
+            },
+            0x0001 => {
+                if self.key[self.regV[((self.opcode & 0x0F00) >> 8) as usize] as usize] == 0 {
+                    self.pc += 2;
+                }
+                self.pc += 2;
+            },
             _      => println!("Unknown opcode"),
         }
     }
     fn opcodeFxxx(&self) {
-        match self.opcode & 0x000F{
-            0x0000 => println!("Clear screen"),
-            0x000E => println!("Return from sub routine"),
+        match self.opcode & 0x00FF{
+            0x0007 => {
+                let indexX: usize = (self.opcode & 0x0F00) >> 8;
+                self.regV[indexX] = self.delay_timer;
+                self.pc += 2;
+            },
+            0x000A => println!("Wait for key pressed"),
+            0x0015 => {
+                let indexX: usize = (self.opcode & 0x0F00) >> 8;
+                self.delay_timer = self.regV[indexX];
+            },
+            0x0018 => {
+                let indexX: usize = (self.opcode & 0x0F00) >> 8;
+                self.sound_timer = self.regV[indexX];
+            },
+            0x001E => {
+                let indexX: usize = (self.opcode & 0x0F00) >> 8;
+                self.indexReg += self.regV[indexX];
+            },
+            0x0029 => println!("Return from sub routine"),
+            0x0033 => println!("Return from sub routine"),
+            0x0055 => println!("Return from sub routine"),
+            0x0065 => println!("Return from sub routine"),
             _      => println!("Unknown opcode"),
         }
     }
